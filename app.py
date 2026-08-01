@@ -15,7 +15,7 @@ else:
     model = None
     print(f"Warning: {MODEL_PATH} not found. Ensure the pickle file is in the root directory.")
 
-# Updated feature names matching dataset's exact leading whitespaces
+# Exact feature names matching dataset's leading whitespaces
 FEATURE_NAMES = [
     ' no_of_dependents',
     ' education',
@@ -37,7 +37,7 @@ INDEX_HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise AI Risk Intelligence Platform</title>
+    <title>AI Loan Approval Risk Intelligence</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -296,6 +296,12 @@ INDEX_HTML = """
             box-shadow: 0 15px 35px -5px var(--accent-glow);
         }
 
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -389,11 +395,11 @@ INDEX_HTML = """
         <header>
             <div class="logo-box">
                 <div class="logo-icon">
-                    <i data-lucide="cpu"></i>
+                    <i data-lucide="shield-check"></i>
                 </div>
                 <div>
-                    <div class="brand-title">XGBoost Risk Intelligence</div>
-                    <div class="brand-subtitle">Production Deployment Dashboard v2.4</div>
+                    <div class="brand-title">AI Loan Approval Risk Intelligence</div>
+                    <div class="brand-subtitle">Automated Underwriting & Decision System</div>
                 </div>
             </div>
 
@@ -490,8 +496,9 @@ INDEX_HTML = """
                             <input type="number" id="bank_asset_value" value="3000000" required>
                         </div>
 
-                        <button type="submit" class="btn-submit">
-                            <i data-lucide="activity"></i> Run ML Prediction Pipeline
+                        <!-- UPDATED BUTTON TEXT -->
+                        <button type="submit" id="submitBtn" class="btn-submit">
+                            <i data-lucide="file-check"></i> Analyze Loan Eligibility
                         </button>
                     </div>
                 </form>
@@ -501,20 +508,20 @@ INDEX_HTML = """
                 <div class="panel-header">
                     <div class="panel-title">
                         <i data-lucide="bar-chart-3" style="color: var(--border-focus);"></i>
-                        Real-Time ML Analytics Engine
+                        Real-Time Risk Analytics Engine
                     </div>
                 </div>
 
                 <div id="placeholderView" class="placeholder-state">
-                    <i data-lucide="cpu" class="placeholder-icon"></i>
-                    <h3>Awaiting System Input</h3>
-                    <p>Execute prediction request on left panel to view XGBoost classification breakdown & risk analytics.</p>
+                    <i data-lucide="shield-alert" class="placeholder-icon"></i>
+                    <h3>Awaiting Financial Profile</h3>
+                    <p>Fill out the application form on the left to run loan evaluation and view eligibility insights.</p>
                 </div>
 
                 <div id="analyticsView" style="display: none;">
                     <div class="result-banner">
                         <div>
-                            <div class="result-title">XGBoost Decision</div>
+                            <div class="result-title">Loan Approval Status</div>
                             <div id="statusText" class="result-status">APPROVED</div>
                         </div>
                         <div style="text-align: right;">
@@ -568,6 +575,11 @@ INDEX_HTML = """
         document.getElementById('predictionForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i data-lucide="loader-2" class="spin"></i> Analyzing Eligibility...`;
+            lucide.createIcons();
+
             const payload = {
                 gender: document.getElementById('gender').value,
                 no_of_dependents: document.getElementById('no_of_dependents').value,
@@ -595,10 +607,14 @@ INDEX_HTML = """
                 if (response.ok) {
                     renderAnalytics(result, payload);
                 } else {
-                    alert('Prediction Error: ' + result.error);
+                    alert('Prediction Error: ' + (result.error || 'Server error occurred'));
                 }
             } catch (err) {
                 alert('Connection Error: ' + err.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<i data-lucide="file-check"></i> Analyze Loan Eligibility`;
+                lucide.createIcons();
             }
         });
 
@@ -621,10 +637,10 @@ INDEX_HTML = """
             document.getElementById('dtiText').innerText = `${data.analytics.dti_ratio}%`;
 
             renderChart(
-                parseFloat(inputs.residential_assets_value),
-                parseFloat(inputs.commercial_assets_value),
-                parseFloat(inputs.luxury_assets_value),
-                parseFloat(inputs.bank_asset_value)
+                parseFloat(inputs.residential_assets_value || 0),
+                parseFloat(inputs.commercial_assets_value || 0),
+                parseFloat(inputs.luxury_assets_value || 0),
+                parseFloat(inputs.bank_asset_value || 0)
             );
         }
 
@@ -674,32 +690,44 @@ def home():
 @app.route('/predict', methods=['POST'])
 def predict():
     if model is None:
-        return jsonify({'error': 'XGBML.pkl model file is not loaded.'}), 500
+        return jsonify({'error': 'XGBML.pkl model file is not loaded on the server.'}), 500
 
     try:
-        data = request.json
+        data = request.json or {}
         
-        # Binary Categorical String Mappings to numerical values expected by XGBoost
+        # Categorical String Mappings
         # Education: Graduate -> 0, Not Graduate -> 1
         # Self Employed: No -> 0, Yes -> 1
         edu_val = 0 if data.get('education') == 'Graduate' else 1
         emp_val = 1 if data.get('self_employed') == 'Yes' else 0
         
+        # Safe numerical type conversion
+        def safe_float(val, default=0.0):
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return default
+
+        def safe_int(val, default=0):
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return default
+
         raw_features = [
-            int(data.get('no_of_dependents', 0)),
+            safe_int(data.get('no_of_dependents'), 0),
             edu_val,
             emp_val,
-            float(data.get('income_annum', 0)),
-            float(data.get('loan_amount', 0)),
-            float(data.get('loan_term', 0)),
-            float(data.get('cibil_score', 0)),
-            float(data.get('residential_assets_value', 0)),
-            float(data.get('commercial_assets_value', 0)),
-            float(data.get('luxury_assets_value', 0)),
-            float(data.get('bank_asset_value', 0))
+            safe_float(data.get('income_annum'), 0.0),
+            safe_float(data.get('loan_amount'), 0.0),
+            safe_float(data.get('loan_term'), 0.0),
+            safe_float(data.get('cibil_score'), 0.0),
+            safe_float(data.get('residential_assets_value'), 0.0),
+            safe_float(data.get('commercial_assets_value'), 0.0),
+            safe_float(data.get('luxury_assets_value'), 0.0),
+            safe_float(data.get('bank_asset_value'), 0.0)
         ]
 
-        # Construct DataFrame with exact whitespace-padded feature names
         df_input = pd.DataFrame([raw_features], columns=FEATURE_NAMES)
         
         prediction = model.predict(df_input)[0]
@@ -711,16 +739,16 @@ def predict():
             approval_prob = 92.5 if prediction == 0 else 12.3
 
         total_assets = (
-            float(data.get('residential_assets_value', 0)) +
-            float(data.get('commercial_assets_value', 0)) +
-            float(data.get('luxury_assets_value', 0)) +
-            float(data.get('bank_asset_value', 0))
+            safe_float(data.get('residential_assets_value')) +
+            safe_float(data.get('commercial_assets_value')) +
+            safe_float(data.get('luxury_assets_value')) +
+            safe_float(data.get('bank_asset_value'))
         )
         
-        loan_to_asset_ratio = round((float(data.get('loan_amount', 0)) / (total_assets + 1e-5)) * 100, 2)
-        dti_ratio = round((float(data.get('loan_amount', 0)) / (float(data.get('income_annum', 1)) + 1e-5)) * 100, 2)
+        loan_to_asset_ratio = round((safe_float(data.get('loan_amount')) / (total_assets + 1e-5)) * 100, 2)
+        dti_ratio = round((safe_float(data.get('loan_amount')) / (safe_float(data.get('income_annum'), 1.0) + 1e-5)) * 100, 2)
 
-        cibil = float(data.get('cibil_score', 0))
+        cibil = safe_float(data.get('cibil_score'))
         if cibil >= 750:
             risk_tier = "Low Risk Tier (Prime)"
             risk_color = "#10b981"
