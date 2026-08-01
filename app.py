@@ -1,6 +1,5 @@
 from flask import Flask, render_template_string, request, jsonify
 import pickle
-import numpy as np
 import pandas as pd
 import os
 
@@ -14,24 +13,24 @@ if os.path.exists(MODEL_PATH):
         model = pickle.load(f)
 else:
     model = None
-    print(f"Warning: {MODEL_PATH} not found. Please ensure the pickle file is in the same directory.")
+    print(f"Warning: {MODEL_PATH} not found. Ensure the pickle file is in the root directory.")
 
-# Expected feature names extracted from XGBML.pkl
+# Updated feature names matching dataset's exact leading whitespaces
 FEATURE_NAMES = [
-    'no_of_dependents',
-    'education',
-    'self_employed',
-    'income_annum',
-    'loan_amount',
-    'loan_term',
-    'cibil_score',
-    'residential_assets_value',
-    'commercial_assets_value',
-    'luxury_assets_value',
-    'bank_asset_value'
+    ' no_of_dependents',
+    ' education',
+    ' self_employed',
+    ' income_annum',
+    ' loan_amount',
+    ' loan_term',
+    ' cibil_score',
+    ' residential_assets_value',
+    ' commercial_assets_value',
+    ' luxury_assets_value',
+    ' bank_asset_value'
 ]
 
-# Single-file HTML/CSS/JS Template
+# Embedded UI Template
 INDEX_HTML = """
 <!DOCTYPE html>
 <html lang="en" data-theme="aurora">
@@ -40,13 +39,11 @@ INDEX_HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enterprise AI Risk Intelligence Platform</title>
     
-    <!-- Google Fonts & Lucide Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        /* CSS VARIABLE THEMING SYSTEM */
         :root[data-theme="aurora"] {
             --bg-base: #0b0f19;
             --bg-card: rgba(18, 24, 38, 0.7);
@@ -57,10 +54,7 @@ INDEX_HTML = """
             --text-secondary: #94a3b8;
             --accent-glow: rgba(99, 102, 241, 0.25);
             --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
-            --button-glow: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(236, 72, 153, 0.5));
-            --card-glass: backdrop-filter: blur(16px) saturate(180%);
             --shadow-premium: 0 20px 50px -10px rgba(0, 0, 0, 0.5), 0 0 30px rgba(99, 102, 241, 0.15);
-            --chart-accent: #8b5cf6;
         }
 
         :root[data-theme="cyberpunk"] {
@@ -73,10 +67,7 @@ INDEX_HTML = """
             --text-secondary: #7000ff;
             --accent-glow: rgba(0, 240, 255, 0.3);
             --primary-gradient: linear-gradient(135deg, #00f0ff 0%, #ff007f 100%);
-            --button-glow: linear-gradient(135deg, rgba(0, 240, 255, 0.6), rgba(255, 0, 127, 0.6));
-            --card-glass: backdrop-filter: blur(12px);
             --shadow-premium: 0 0 35px rgba(0, 240, 255, 0.25);
-            --chart-accent: #00f0ff;
         }
 
         :root[data-theme="midnight"] {
@@ -89,13 +80,9 @@ INDEX_HTML = """
             --text-secondary: #6b7280;
             --accent-glow: rgba(16, 185, 129, 0.2);
             --primary-gradient: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
-            --button-glow: linear-gradient(135deg, rgba(16, 185, 129, 0.4), rgba(6, 182, 212, 0.4));
-            --card-glass: backdrop-filter: blur(20px);
             --shadow-premium: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
-            --chart-accent: #10b981;
         }
 
-        /* GLOBAL BASE STYLES */
         * {
             margin: 0;
             padding: 0;
@@ -149,7 +136,6 @@ INDEX_HTML = """
             justify-content: center;
             color: white;
             box-shadow: 0 8px 20px var(--accent-glow);
-            animation: pulse-glow 3s infinite alternate;
         }
 
         .brand-title {
@@ -305,28 +291,9 @@ INDEX_HTML = """
             transition: all 0.3s ease;
         }
 
-        .btn-submit::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            transition: left 0.7s ease;
-        }
-
-        .btn-submit:hover::before {
-            left: 100%;
-        }
-
         .btn-submit:hover {
             transform: translateY(-2px);
             box-shadow: 0 15px 35px -5px var(--accent-glow);
-        }
-
-        .btn-submit:active {
-            transform: translateY(1px);
         }
 
         .metrics-grid {
@@ -393,11 +360,6 @@ INDEX_HTML = """
             margin-top: 1rem;
         }
 
-        @keyframes pulse-glow {
-            0% { box-shadow: 0 0 15px var(--accent-glow); }
-            100% { box-shadow: 0 0 30px var(--accent-glow), 0 0 50px var(--accent-glow); }
-        }
-
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -419,33 +381,11 @@ INDEX_HTML = """
             height: 64px;
             opacity: 0.3;
         }
-
-        .tooltip {
-            position: relative;
-            cursor: pointer;
-        }
-
-        .tooltip:hover::after {
-            content: attr(data-tip);
-            position: absolute;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: #fff;
-            padding: 0.4rem 0.8rem;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            white-space: nowrap;
-            z-index: 100;
-            border: 1px solid var(--border-color);
-        }
     </style>
 </head>
 <body>
 
     <div class="app-container">
-        <!-- APP HEADER -->
         <header>
             <div class="logo-box">
                 <div class="logo-icon">
@@ -457,7 +397,6 @@ INDEX_HTML = """
                 </div>
             </div>
 
-            <!-- THEME SWITCHER -->
             <div class="theme-switcher">
                 <button class="theme-btn active" onclick="setTheme('aurora', event)">
                     <i data-lucide="sparkles"></i> Aurora
@@ -471,25 +410,17 @@ INDEX_HTML = """
             </div>
         </header>
 
-        <!-- DASHBOARD GRID -->
         <div class="dashboard-grid">
-            
-            <!-- LEFT PANEL: INPUT FORM -->
             <div class="glass-panel">
                 <div class="panel-header">
                     <div class="panel-title">
                         <i data-lucide="sliders" style="color: var(--border-focus);"></i>
                         Applicant Financial Profile
                     </div>
-                    <span class="tooltip" data-tip="Complete profile to execute prediction pipeline">
-                        <i data-lucide="info" style="color: var(--text-secondary); width: 18px;"></i>
-                    </span>
                 </div>
 
                 <form id="predictionForm">
                     <div class="form-grid">
-                        
-                        <!-- Categorical Feature: Category / Gender -->
                         <div class="input-group">
                             <label><i data-lucide="user"></i> Gender Category</label>
                             <select id="gender" required>
@@ -498,13 +429,11 @@ INDEX_HTML = """
                             </select>
                         </div>
 
-                        <!-- Dependents -->
                         <div class="input-group">
                             <label><i data-lucide="users"></i> Dependents</label>
                             <input type="number" id="no_of_dependents" value="2" min="0" max="10" required>
                         </div>
 
-                        <!-- Categorical Feature: Education -->
                         <div class="input-group">
                             <label><i data-lucide="graduation-cap"></i> Education</label>
                             <select id="education" required>
@@ -513,7 +442,6 @@ INDEX_HTML = """
                             </select>
                         </div>
 
-                        <!-- Categorical Feature: Self Employed -->
                         <div class="input-group">
                             <label><i data-lucide="briefcase"></i> Self Employed</label>
                             <select id="self_employed" required>
@@ -522,31 +450,26 @@ INDEX_HTML = """
                             </select>
                         </div>
 
-                        <!-- Annual Income -->
                         <div class="input-group">
                             <label><i data-lucide="indian-rupee"></i> Annual Income (₹)</label>
                             <input type="number" id="income_annum" value="7500000" step="10000" required>
                         </div>
 
-                        <!-- Loan Amount -->
                         <div class="input-group">
                             <label><i data-lucide="landmark"></i> Loan Amount (₹)</label>
                             <input type="number" id="loan_amount" value="15000000" step="10000" required>
                         </div>
 
-                        <!-- Loan Term -->
                         <div class="input-group">
                             <label><i data-lucide="calendar"></i> Term (Years)</label>
                             <input type="number" id="loan_term" value="10" min="1" max="30" required>
                         </div>
 
-                        <!-- CIBIL Score -->
                         <div class="input-group">
                             <label><i data-lucide="shield-check"></i> CIBIL Score</label>
                             <input type="number" id="cibil_score" value="780" min="300" max="900" required>
                         </div>
 
-                        <!-- Asset Values -->
                         <div class="input-group">
                             <label><i data-lucide="home"></i> Residential Assets (₹)</label>
                             <input type="number" id="residential_assets_value" value="6000000" required>
@@ -567,16 +490,13 @@ INDEX_HTML = """
                             <input type="number" id="bank_asset_value" value="3000000" required>
                         </div>
 
-                        <!-- Submit Button -->
                         <button type="submit" class="btn-submit">
                             <i data-lucide="activity"></i> Run ML Prediction Pipeline
                         </button>
-
                     </div>
                 </form>
             </div>
 
-            <!-- RIGHT PANEL: ANALYTICS DASHBOARD -->
             <div class="glass-panel" id="resultsPanel">
                 <div class="panel-header">
                     <div class="panel-title">
@@ -629,9 +549,7 @@ INDEX_HTML = """
                         <canvas id="assetChart"></canvas>
                     </div>
                 </div>
-
             </div>
-
         </div>
     </div>
 
@@ -756,16 +674,17 @@ def home():
 @app.route('/predict', methods=['POST'])
 def predict():
     if model is None:
-        return jsonify({'error': 'XGBML.pkl model file is not present or loaded.'}), 500
+        return jsonify({'error': 'XGBML.pkl model file is not loaded.'}), 500
 
     try:
         data = request.json
         
-        # Categorical String Mappings to Integers
+        # Binary Categorical String Mappings to numerical values expected by XGBoost
+        # Education: Graduate -> 0, Not Graduate -> 1
+        # Self Employed: No -> 0, Yes -> 1
         edu_val = 0 if data.get('education') == 'Graduate' else 1
         emp_val = 1 if data.get('self_employed') == 'Yes' else 0
         
-        # Array matching model input layout
         raw_features = [
             int(data.get('no_of_dependents', 0)),
             edu_val,
@@ -780,15 +699,16 @@ def predict():
             float(data.get('bank_asset_value', 0))
         ]
 
+        # Construct DataFrame with exact whitespace-padded feature names
         df_input = pd.DataFrame([raw_features], columns=FEATURE_NAMES)
         
         prediction = model.predict(df_input)[0]
         
         if hasattr(model, 'predict_proba'):
             prob = model.predict_proba(df_input)[0]
-            approval_prob = round(float(prob[1]) * 100, 2) if len(prob) > 1 else (95.0 if prediction == 1 else 15.0)
+            approval_prob = round(float(prob[0]) * 100, 2) if int(prediction) == 0 else round(float(prob[1]) * 100, 2)
         else:
-            approval_prob = 92.5 if prediction == 1 else 12.3
+            approval_prob = 92.5 if prediction == 0 else 12.3
 
         total_assets = (
             float(data.get('residential_assets_value', 0)) +
